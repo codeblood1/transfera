@@ -1,207 +1,206 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router';
-import { X, Mail, Lock, User, ArrowRight } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import HeroSection from '@/sections/HeroSection';
-import FeaturesSection from '@/sections/FeaturesSection';
-import ConverterSection from '@/sections/ConverterSection';
-import DestinationsSection from '@/sections/DestinationsSection';
-import SecuritySection from '@/sections/SecuritySection';
-import SupportSection from '@/sections/SupportSection';
-import CTASection from '@/sections/CTASection';
-import FooterSection from '@/sections/FooterSection';
+import { useEffect, useRef } from 'react';
+import { LogIn, Globe, Users, MapPin, Shield } from 'lucide-react';
+import gsap from 'gsap';
 
-type AuthModal = 'login' | 'signup' | null;
+interface HeroSectionProps {
+  onOpenSignup?: () => void;
+  onOpenLogin?: () => void;
+}
 
-export default function Landing() {
-  const { signUp, signIn, user } = useAuth();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [modal, setModal] = useState<AuthModal>(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState('');
+export default function HeroSection({ onOpenSignup, onOpenLogin }: HeroSectionProps) {
+  const textRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Redirect to dashboard if already logged in
+  // Animated particle canvas background
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
-    }
-  }, [user, navigate]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
 
-  // Listen for URL-based modal triggers (from Navigation)
+    let w = canvas.width = canvas.offsetWidth;
+    let h = canvas.height = canvas.offsetHeight;
+
+    const particles: { x: number; y: number; vx: number; vy: number; size: number; alpha: number }[] = [];
+    for (let i = 0; i < 60; i++) {
+      particles.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        size: Math.random() * 2 + 1,
+        alpha: Math.random() * 0.5 + 0.2,
+      });
+    }
+
+    let animId: number;
+    function animate() {
+      animId = requestAnimationFrame(animate);
+      context!.clearRect(0, 0, w, h);
+
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0) p.x = w;
+        if (p.x > w) p.x = 0;
+        if (p.y < 0) p.y = h;
+        if (p.y > h) p.y = 0;
+
+        context!.beginPath();
+        context!.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        context!.fillStyle = `rgba(212, 168, 83, ${p.alpha})`;
+        context!.fill();
+      });
+
+      particles.forEach((p1, i) => {
+        particles.slice(i + 1).forEach(p2 => {
+          const dx = p1.x - p2.x;
+          const dy = p1.y - p2.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 150) {
+            context!.beginPath();
+            context!.moveTo(p1.x, p1.y);
+            context!.lineTo(p2.x, p2.y);
+            context!.strokeStyle = `rgba(212, 168, 83, ${0.08 * (1 - dist / 150)})`;
+            context!.lineWidth = 0.5;
+            context!.stroke();
+          }
+        });
+      });
+    }
+    animate();
+
+    const handleResize = () => {
+      w = canvas.width = canvas.offsetWidth;
+      h = canvas.height = canvas.offsetHeight;
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   useEffect(() => {
-    if (searchParams.get('signup') === 'true') {
-      setModal('signup');
-      setSearchParams({});
-    } else if (searchParams.get('login') === 'true') {
-      setModal('login');
-      setSearchParams({});
-    }
-  }, [searchParams, setSearchParams]);
-
-  const openSignup = useCallback(() => {
-    setModal('signup');
-    setError('');
-    setSuccess('');
+    if (!textRef.current) return;
+    const els = textRef.current.querySelectorAll('.animate-in');
+    gsap.fromTo(els, { y: 30, opacity: 0 }, {
+      y: 0, opacity: 1, duration: 0.8, stagger: 0.2, ease: 'power3.out', delay: 0.3,
+    });
   }, []);
-
-  const openLogin = useCallback(() => {
-    setModal('login');
-    setError('');
-    setSuccess('');
-  }, []);
-
-  const closeModal = useCallback(() => {
-    setModal(null);
-    setError('');
-    setSuccess('');
-  }, []);
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      await signUp(email, password, fullName);
-      setSuccess('Check your email to confirm your account!');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Signup failed');
-    }
-    setLoading(false);
-  };
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      await signIn(email, password);
-      closeModal();
-      navigate('/dashboard');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Invalid credentials');
-    }
-    setLoading(false);
-  };
 
   return (
-    <div className="bg-deep-blue min-h-screen">
-      <HeroSection onOpenSignup={openSignup} />
-      <FeaturesSection />
-      <ConverterSection onOpenSignup={openSignup} />
-      <DestinationsSection />
-      <SecuritySection />
-      <SupportSection />
-      <CTASection onOpenSignup={openSignup} />
-      <FooterSection />
+    <section className="relative min-h-screen flex items-center overflow-hidden">
+      {/* Background layers */}
+      <div className="absolute inset-0 z-0" style={{
+        background: 'radial-gradient(ellipse at 30% 50%, #1a2744 0%, #0C1222 50%, #080e1a 100%)',
+      }} />
+      <div className="absolute inset-0 z-0 opacity-30" style={{
+        background: 'radial-gradient(circle at 70% 30%, rgba(212,168,83,0.12) 0%, transparent 50%)',
+      }} />
+      <canvas
+        ref={canvasRef}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 1 }}
+      />
 
-      {/* Auth Modal */}
-      {modal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative bg-surface rounded-2xl border border-white/10 w-full max-w-md p-8 shadow-card">
-            <button onClick={closeModal} className="absolute top-4 right-4 text-[rgba(245,245,240,0.45)] hover:text-[#F5F5F0] transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-
-            <h2 className="text-2xl font-medium text-[#F5F5F0] tracking-tight">
-              {modal === 'signup' ? 'Create Account' : 'Welcome Back'}
-            </h2>
-            <p className="text-sm text-[rgba(245,245,240,0.45)] mt-2">
-              {modal === 'signup'
-                ? 'Start sending money securely today.'
-                : 'Sign in to your Transfera account.'}
-            </p>
-
-            {error && (
-              <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                {error}
+      {/* Glass card decorative element */}
+      <div className="absolute right-[10%] top-1/2 -translate-y-1/2 z-[2] hidden lg:block">
+        <div className="relative w-[340px] h-[220px]" style={{ perspective: '1000px' }}>
+          <div className="absolute inset-0 rounded-2xl"
+            style={{
+              background: 'linear-gradient(135deg, rgba(27,33,50,0.8) 0%, rgba(12,18,34,0.9) 100%)',
+              border: '1px solid rgba(245,245,240,0.1)',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 25px 80px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)',
+              transform: 'rotateY(-15deg) rotateX(5deg)',
+            }}>
+            {/* Card content */}
+            <div className="p-6 h-full flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-full bg-soft-amber/90 flex items-center justify-center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0C1222" strokeWidth="3"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+                </div>
+                <span className="font-mono text-xs text-[rgba(245,245,240,0.4)]">DEBIT</span>
               </div>
-            )}
-            {success && (
-              <div className="mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
-                {success}
-              </div>
-            )}
-
-            <form onSubmit={modal === 'signup' ? handleSignUp : handleSignIn} className="mt-6 space-y-4">
-              {modal === 'signup' && (
-                <div>
-                  <label className="text-xs font-medium tracking-wide uppercase text-[rgba(245,245,240,0.45)]">Full Name</label>
-                  <div className="relative mt-1.5">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[rgba(245,245,240,0.35)]" />
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={e => setFullName(e.target.value)}
-                      className="w-full bg-glass border border-input-border rounded-lg pl-10 pr-4 py-3 text-sm text-[#F5F5F0] placeholder:text-[rgba(245,245,240,0.25)] focus:border-soft-amber focus:ring-1 focus:ring-soft-amber/20 transition-all outline-none"
-                      placeholder="John Doe"
-                      required
-                    />
+              <div>
+                <div className="flex gap-3 mb-4">
+                  {[0, 1, 2, 3].map(i => (
+                    <div key={i} className="font-mono text-lg text-[rgba(245,245,240,0.8)] tracking-widest">****</div>
+                  ))}
+                </div>
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-[10px] text-[rgba(245,245,240,0.35)] uppercase tracking-wider">Card Holder</p>
+                    <p className="text-sm text-[rgba(245,245,240,0.7)] mt-0.5">TRANSFERA USER</p>
                   </div>
-                </div>
-              )}
-              <div>
-                <label className="text-xs font-medium tracking-wide uppercase text-[rgba(245,245,240,0.45)]">Email</label>
-                <div className="relative mt-1.5">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[rgba(245,245,240,0.35)]" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    className="w-full bg-glass border border-input-border rounded-lg pl-10 pr-4 py-3 text-sm text-[#F5F5F0] placeholder:text-[rgba(245,245,240,0.25)] focus:border-soft-amber focus:ring-1 focus:ring-soft-amber/20 transition-all outline-none"
-                    placeholder="you@example.com"
-                    required
-                  />
+                  <div className="w-12 h-8 rounded bg-gradient-to-r from-yellow-600/30 to-yellow-400/20" />
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-medium tracking-wide uppercase text-[rgba(245,245,240,0.45)]">Password</label>
-                <div className="relative mt-1.5">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[rgba(245,245,240,0.35)]" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full bg-glass border border-input-border rounded-lg pl-10 pr-4 py-3 text-sm text-[#F5F5F0] placeholder:text-[rgba(245,245,240,0.25)] focus:border-soft-amber focus:ring-1 focus:ring-soft-amber/20 transition-all outline-none"
-                    placeholder="Min 8 characters"
-                    required
-                    minLength={8}
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3.5 rounded-lg bg-soft-amber text-deep-blue font-semibold hover:shadow-glow transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? 'Please wait...' : modal === 'signup' ? 'Create Account' : 'Sign In'}
-                {!loading && <ArrowRight className="w-4 h-4" />}
-              </button>
-            </form>
-
-            <p className="text-center text-sm text-[rgba(245,245,240,0.45)] mt-5">
-              {modal === 'signup' ? (
-                <>Already have an account?{' '}
-                  <button onClick={openLogin} className="text-soft-amber hover:underline">
-                    Sign in
-                  </button>
-                </>
-              ) : (
-                <>Don't have an account?{' '}
-                  <button onClick={openSignup} className="text-soft-amber hover:underline">
-                    Create one
-                  </button>
-                </>
-              )}
-            </p>
+            </div>
+            {/* Shimmer band */}
+            <div className="absolute top-[35%] left-0 right-0 h-10"
+              style={{
+                background: 'linear-gradient(90deg, transparent 0%, rgba(192,200,216,0.08) 30%, rgba(192,200,216,0.15) 50%, rgba(192,200,216,0.08) 70%, transparent 100%)',
+              }}
+            />
           </div>
         </div>
-      )}
-    </div>
+      </div>
+
+      {/* Text content */}
+      <div className="relative z-10 w-full content-max container-padding py-32">
+        <div className="max-w-xl" ref={textRef}>
+          <p className="animate-in text-xs font-medium tracking-[0.12em] uppercase text-soft-amber mb-6">
+            International Transfers
+          </p>
+          <h1 className="animate-in text-[clamp(42px,6vw,84px)] font-medium leading-[0.92] tracking-[-0.03em] text-[#F5F5F0]">
+            Send money{' '}
+            <em className="font-serif italic text-soft-amber">securely</em>, anywhere in the world
+          </h1>
+          <p className="animate-in text-base text-[rgba(245,245,240,0.55)] mt-6 max-w-[480px] leading-relaxed">
+            Bank-level security. Competitive rates. 150+ countries. No hidden fees.
+          </p>
+          <div className="animate-in flex items-center gap-4 mt-8">
+            <button
+              onClick={onOpenSignup}
+              className="px-7 py-3.5 rounded-full bg-soft-amber text-deep-blue font-semibold hover:shadow-glow transition-all hover:-translate-y-0.5"
+            >
+              Get Started
+            </button>
+            <button
+              onClick={onOpenLogin}
+              className="flex items-center gap-2 px-7 py-3.5 rounded-full border border-[rgba(245,245,240,0.2)] text-[#F5F5F0] hover:bg-white/5 transition-all"
+            >
+              <LogIn className="w-4 h-4" /> Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats bar overlapping bottom */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 translate-y-1/2">
+        <div className="content-max container-padding">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { icon: Globe, value: '$10B+', label: 'TRANSFERRED' },
+              { icon: Users, value: '2M+', label: 'ACTIVE USERS' },
+              { icon: MapPin, value: '150+', label: 'COUNTRIES' },
+              { icon: Shield, value: '99.9%', label: 'UPTIME' },
+            ].map((stat, i) => (
+              <div key={i} className="bg-surface rounded-xl px-5 py-5 border border-white/5 text-center">
+                <div className="w-10 h-10 rounded-full bg-soft-amber/20 flex items-center justify-center mx-auto mb-3">
+                  <stat.icon className="w-5 h-5 text-soft-amber" />
+                </div>
+                <p className="text-2xl md:text-3xl font-mono font-medium text-[#F5F5F0]">{stat.value}</p>
+                <p className="text-[11px] font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.45)] mt-1">
+                  {stat.label}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
