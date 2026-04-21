@@ -153,21 +153,13 @@ export default function Dashboard() {
       const result = await createTransfer({
         sender_account_id: profile.account.id,
         recipient_type: 'external_bank',
-        recipient_account_id: null,
         recipient_name: recipientName.trim(),
-        recipient_email: null,
-        recipient_phone: null,
-        recipient_bank_name: null,
-        recipient_account_number: accountNumber.trim() || null,
-        recipient_routing_number: null,
         recipient_country: selectedCountry?.name || country,
         amount: amt,
-        fee: 0,
-        exchange_rate: null,
-        converted_amount: null,
         currency: currency,
         recipient_currency: selectedCountry?.currency_code || currency,
-        description: description.trim() || `Transfer to ${recipientName.trim()}`,
+        ...(accountNumber.trim() ? { recipient_account_number: accountNumber.trim() } : {}),
+        ...(description.trim() ? { description: description.trim() } : {}),
       });
       if (result) {
         setToast({

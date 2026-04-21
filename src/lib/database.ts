@@ -148,13 +148,62 @@ export async function getTransactions(accountId: string, limit = 20): Promise<Tr
 
 // ==================== TRANSFERS ====================
 
-export async function createTransfer(transfer: Omit<Transfer, 'id' | 'reference_code' | 'status' | 'created_at' | 'updated_at' | 'approved_at' | 'approved_by' | 'completed_at' | 'rejection_reason'>): Promise<Transfer | null> {
+export interface CreateTransferInput {
+  sender_account_id: string;
+  recipient_type: 'internal' | 'external_bank' | 'mobile_wallet' | 'cash_pickup';
+  recipient_account_id?: string | null;
+  recipient_name: string;
+  recipient_email?: string | null;
+  recipient_phone?: string | null;
+  recipient_bank_name?: string | null;
+  recipient_account_number?: string | null;
+  recipient_routing_number?: string | null;
+  recipient_country: string;
+  amount: number;
+  fee?: number;
+  exchange_rate?: number | null;
+  converted_amount?: number | null;
+  currency: string;
+  recipient_currency: string;
+  description?: string | null;
+}
+
+export async function createTransfer(input: CreateTransferInput): Promise<Transfer | null> {
+  // Build clean payload - only include fields that are actually set (not undefined)
+  // This prevents PostgREST columns/body mismatch errors
+  const payload: Record<string, unknown> = {
+    sender_account_id: input.sender_account_id,
+    recipient_type: input.recipient_type,
+    recipient_name: input.recipient_name,
+    recipient_country: input.recipient_country,
+    amount: input.amount,
+    currency: input.currency,
+    recipient_currency: input.recipient_currency,
+    status: 'pending',
+  };
+
+  // Only add optional fields if they have a non-undefined value
+  if (input.recipient_account_id !== undefined) payload.recipient_account_id = input.recipient_account_id;
+  if (input.recipient_email !== undefined) payload.recipient_email = input.recipient_email;
+  if (input.recipient_phone !== undefined) payload.recipient_phone = input.recipient_phone;
+  if (input.recipient_bank_name !== undefined) payload.recipient_bank_name = input.recipient_bank_name;
+  if (input.recipient_account_number !== undefined) payload.recipient_account_number = input.recipient_account_number;
+  if (input.recipient_routing_number !== undefined) payload.recipient_routing_number = input.recipient_routing_number;
+  if (input.fee !== undefined) payload.fee = input.fee;
+  if (input.exchange_rate !== undefined) payload.exchange_rate = input.exchange_rate;
+  if (input.converted_amount !== undefined) payload.converted_amount = input.converted_amount;
+  if (input.description !== undefined) payload.description = input.description;
+
   const { data, error } = await supabase
     .from('transfers')
-    .insert([{ ...transfer, status: 'pending' }])
+    .insert([payload])
     .select()
     .single();
-  if (error) throw error;
+
+  if (error) {
+    console.error('createTransfer error:', error.message, error.details, error.hint);
+    throw new Error(error.message);
+  }
   return data as Transfer;
 }
 
