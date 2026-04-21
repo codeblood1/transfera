@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 35% 9%;
+    --foreground: 43 33% 95%;
+    --card: 225 28% 12%;
+    --card-foreground: 43 33% 95%;
+    --popover: 225 28% 12%;
+    --popover-foreground: 43 33% 95%;
+    --primary: 40 54% 58%;
+    --primary-foreground: 222 35% 9%;
+    --secondary: 225 28% 12%;
+    --secondary-foreground: 43 33% 95%;
+    --muted: 225 20% 18%;
+    --muted-foreground: 218 15% 55%;
+    --accent: 225 28% 16%;
+    --accent-foreground: 43 33% 95%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 43 33% 95%;
+    --border: 225 20% 18%;
+    --input: 225 30% 24%;
+    --ring: 40 54% 58%;
+    --radius: 0.625rem;
+  }
+
+  body {
+    @apply bg-deep-blue text-[#F5F5F0] antialiased;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .section-padding {
+    @apply py-[clamp(80px,10vh,160px)];
+  }
+
+  .container-padding {
+    @apply px-[clamp(24px,5vw,64px)];
+  }
+
+  .content-max {
+    @apply max-w-[1280px] mx-auto;
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #D4A853 0%, #F5F5F0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
