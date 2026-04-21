@@ -357,11 +357,8 @@ export default function Dashboard() {
               <span className="text-lg font-semibold text-[#F5F5F0]">Transfera</span>
             </Link>
             <nav className="hidden md:flex items-center gap-1">
-              {['Dashboard', 'Transfers', 'Recipients', 'Cards'].map((item) => (
-                <button key={item} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${item === 'Dashboard' ? 'bg-white/10 text-[#F5F5F0]' : 'text-[#F5F5F0]/50 hover:text-[#F5F5F0] hover:bg-white/5'}`}>
-                  {item}
-                </button>
-              ))}
+              <Link to="/dashboard" className="px-4 py-2 rounded-lg text-sm font-medium bg-white/10 text-[#F5F5F0] transition-all">Dashboard</Link>
+              <Link to="/transfers" className="px-4 py-2 rounded-lg text-sm font-medium text-[#F5F5F0]/50 hover:text-[#F5F5F0] hover:bg-white/5 transition-all">Transfers</Link>
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -457,15 +454,6 @@ export default function Dashboard() {
               <div className="p-6">
                 {activeTab === 'send' && (
                   <form onSubmit={handleSend} className="space-y-5">
-                    {/* Approval Workflow Info */}
-                    <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4 flex items-start gap-3">
-                      <Shield className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-sm text-blue-400 font-medium">Admin Approval Required</p>
-                        <p className="text-xs text-blue-400/60 mt-0.5">Your transfer will be created with status "Pending". An admin must approve it in the Supabase dashboard before funds are deducted and the transfer completes.</p>
-                      </div>
-                    </div>
-
                     <div>
                       <label className="text-xs font-medium text-[#F5F5F0]/40 uppercase tracking-wider mb-3 block">Quick Select Recipient</label>
                       <div className="flex gap-3 overflow-x-auto pb-2">
