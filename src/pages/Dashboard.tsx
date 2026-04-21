@@ -154,7 +154,8 @@ export default function Dashboard() {
         sender_account_id: profile.account.id,
         recipient_type: 'external_bank',
         recipient_name: recipientName.trim(),
-        recipient_country: selectedCountry?.name || country,
+        // AFTER — "US" is 2 characters, fits perfectly
+        recipient_country: selectedCountry?.code || country,
         amount: amt,
         currency: currency,
         recipient_currency: selectedCountry?.currency_code || currency,
