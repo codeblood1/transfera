@@ -46,7 +46,7 @@ export default function Navigation() {
           <a href="/#features" className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors">Features</a>
           <a href="/#destinations" className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors">Destinations</a>
           <a href="/#security" className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors">Security</a>
-          <a href="/#testimonials" className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors">Support</a>
+          <a href="/#support" className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors">Support</a>
         </div>
 
         <div className="hidden md:flex items-center gap-4">
@@ -103,7 +103,7 @@ export default function Navigation() {
             <a href="/#features" onClick={() => setMobileOpen(false)} className="text-sm text-[rgba(245,245,240,0.75)]">Features</a>
             <a href="/#destinations" onClick={() => setMobileOpen(false)} className="text-sm text-[rgba(245,245,240,0.75)]">Destinations</a>
             <a href="/#security" onClick={() => setMobileOpen(false)} className="text-sm text-[rgba(245,245,240,0.75)]">Security</a>
-            <a href="/#testimonials" onClick={() => setMobileOpen(false)} className="text-sm text-[rgba(245,245,240,0.75)]">Support</a>
+            <a href="/#support" onClick={() => setMobileOpen(false)} className="text-sm text-[rgba(245,245,240,0.75)]">Support</a>
             <div className="border-t border-white/10 pt-4">
               {user ? (
                 <>

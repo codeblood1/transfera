@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useSearchParams } from 'react-router';
+import { useSearchParams, useNavigate } from 'react-router';
 import { X, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import HeroSection from '@/sections/HeroSection';
@@ -7,14 +7,15 @@ import FeaturesSection from '@/sections/FeaturesSection';
 import ConverterSection from '@/sections/ConverterSection';
 import DestinationsSection from '@/sections/DestinationsSection';
 import SecuritySection from '@/sections/SecuritySection';
-import TestimonialsSection from '@/sections/TestimonialsSection';
+import SupportSection from '@/sections/SupportSection';
 import CTASection from '@/sections/CTASection';
 import FooterSection from '@/sections/FooterSection';
 
 type AuthModal = 'login' | 'signup' | null;
 
 export default function Landing() {
-  const { signUp, signIn } = useAuth();
+  const { signUp, signIn, user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [modal, setModal] = useState<AuthModal>(null);
   const [email, setEmail] = useState('');
@@ -23,6 +24,13 @@ export default function Landing() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
+
+  // Redirect to dashboard if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   // Listen for URL-based modal triggers (from Navigation)
   useEffect(() => {
@@ -73,6 +81,7 @@ export default function Landing() {
     try {
       await signIn(email, password);
       closeModal();
+      navigate('/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Invalid credentials');
     }
@@ -86,7 +95,7 @@ export default function Landing() {
       <ConverterSection onOpenSignup={openSignup} />
       <DestinationsSection />
       <SecuritySection />
-      <TestimonialsSection />
+      <SupportSection />
       <CTASection onOpenSignup={openSignup} />
       <FooterSection />
 
