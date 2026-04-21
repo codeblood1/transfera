@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { Play, Globe, Users, MapPin, Shield } from 'lucide-react';
+import { LogIn, Globe, Users, MapPin, Shield } from 'lucide-react';
 import gsap from 'gsap';
 
 interface HeroSectionProps {
   onOpenSignup?: () => void;
+  onOpenLogin?: () => void;
 }
 
-export default function HeroSection({ onOpenSignup }: HeroSectionProps) {
+export default function HeroSection({ onOpenSignup, onOpenLogin }: HeroSectionProps) {
   const textRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -168,10 +169,10 @@ export default function HeroSection({ onOpenSignup }: HeroSectionProps) {
               Get Started
             </button>
             <button
-              onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={onOpenLogin}
               className="flex items-center gap-2 px-7 py-3.5 rounded-full border border-[rgba(245,245,240,0.2)] text-[#F5F5F0] hover:bg-white/5 transition-all"
             >
-              <Play className="w-4 h-4" /> Watch Demo
+              <LogIn className="w-4 h-4" /> Sign In
             </button>
           </div>
         </div>

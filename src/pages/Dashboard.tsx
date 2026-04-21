@@ -248,6 +248,30 @@ export default function Dashboard() {
   const pendingCount = transfers.filter(t => t.status === 'pending').length;
   const availableBalance = balance - pendingAmount;
 
+  // Transfer limits — dynamically calculated from actual transfers
+  const DAILY_LIMIT = 30000;
+  const MONTHLY_LIMIT = 100000;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
+
+  const dailySent = transfers
+    .filter(t => {
+      const d = new Date(t.created_at);
+      return d >= todayStart && (t.status === 'completed' || t.status === 'pending');
+    })
+    .reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0), 0);
+
+  const monthlySent = transfers
+    .filter(t => {
+      const d = new Date(t.created_at);
+      return d >= monthStart && (t.status === 'completed' || t.status === 'pending');
+    })
+    .reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0), 0);
+
+  const dailyPct = Math.min((dailySent / DAILY_LIMIT) * 100, 100);
+  const monthlyPct = Math.min((monthlySent / MONTHLY_LIMIT) * 100, 100);
+
   // Virtual card
   const virtualCard = generateVirtualCard(myAccountNumber || 'TR00000000');
 
@@ -693,20 +717,20 @@ export default function Dashboard() {
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-[#F5F5F0]/50">Daily Limit</span>
-                    <span className="text-[#F5F5F0] font-mono">$10,000 USD</span>
+                    <span className="text-[#F5F5F0]/50">Daily ({formatCurrency(dailySent, currency)})</span>
+                    <span className="text-[#F5F5F0] font-mono">{formatCurrency(DAILY_LIMIT, currency)}</span>
                   </div>
                   <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-[#D4A853] to-[#B08A3E] rounded-full" style={{ width: '25%' }} />
+                    <div className="h-full bg-gradient-to-r from-[#D4A853] to-[#B08A3E] rounded-full transition-all duration-500" style={{ width: `${dailyPct}%` }} />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-[#F5F5F0]/50">Monthly Limit</span>
-                    <span className="text-[#F5F5F0] font-mono">$50,000 USD</span>
+                    <span className="text-[#F5F5F0]/50">Monthly ({formatCurrency(monthlySent, currency)})</span>
+                    <span className="text-[#F5F5F0] font-mono">{formatCurrency(MONTHLY_LIMIT, currency)}</span>
                   </div>
                   <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-[#D4A853] to-[#B08A3E] rounded-full" style={{ width: '15%' }} />
+                    <div className="h-full bg-gradient-to-r from-[#D4A853] to-[#B08A3E] rounded-full transition-all duration-500" style={{ width: `${monthlyPct}%` }} />
                   </div>
                 </div>
               </div>
