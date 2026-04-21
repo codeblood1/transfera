@@ -3,7 +3,11 @@ import { useSearchParams, useNavigate } from 'react-router';
 import { X, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import HeroSection from '@/sections/HeroSection';
+import FeaturesSection from '@/sections/FeaturesSection';
 import ConverterSection from '@/sections/ConverterSection';
+import DestinationsSection from '@/sections/DestinationsSection';
+import SecuritySection from '@/sections/SecuritySection';
+import SupportSection from '@/sections/SupportSection';
 import CTASection from '@/sections/CTASection';
 import FooterSection from '@/sections/FooterSection';
 
@@ -87,7 +91,11 @@ export default function Landing() {
   return (
     <div className="bg-deep-blue min-h-screen">
       <HeroSection onOpenSignup={openSignup} onOpenLogin={openLogin} />
+      <FeaturesSection />
       <ConverterSection onOpenSignup={openSignup} />
+      <DestinationsSection />
+      <SecuritySection />
+      <SupportSection />
       <CTASection onOpenSignup={openSignup} />
       <FooterSection />
 
@@ -197,4 +205,3 @@ export default function Landing() {
     </div>
   );
 }
-

@@ -43,10 +43,20 @@ export default function Navigation() {
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
-          <a href="/#features" className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors">Features</a>
-          <a href="/#destinations" className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors">Destinations</a>
-          <a href="/#security" className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors">Security</a>
-          <a href="/#support" className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors">Support</a>
+          {[
+            { label: 'Features', id: 'features' },
+            { label: 'Destinations', id: 'destinations' },
+            { label: 'Security', id: 'security' },
+            { label: 'Support', id: 'support' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}
+              className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors"
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
 
         <div className="hidden md:flex items-center gap-4">
@@ -100,10 +110,20 @@ export default function Navigation() {
       {mobileOpen && (
         <div className="absolute top-16 left-0 right-0 bg-deep-blue/95 backdrop-blur-xl border-b border-white/10 py-6 md:hidden">
           <div className="container-padding flex flex-col gap-4">
-            <a href="/#features" onClick={() => setMobileOpen(false)} className="text-sm text-[rgba(245,245,240,0.75)]">Features</a>
-            <a href="/#destinations" onClick={() => setMobileOpen(false)} className="text-sm text-[rgba(245,245,240,0.75)]">Destinations</a>
-            <a href="/#security" onClick={() => setMobileOpen(false)} className="text-sm text-[rgba(245,245,240,0.75)]">Security</a>
-            <a href="/#support" onClick={() => setMobileOpen(false)} className="text-sm text-[rgba(245,245,240,0.75)]">Support</a>
+            {[
+              { label: 'Features', id: 'features' },
+              { label: 'Destinations', id: 'destinations' },
+              { label: 'Security', id: 'security' },
+              { label: 'Support', id: 'support' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => { document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' }); setMobileOpen(false); }}
+                className="text-left text-sm text-[rgba(245,245,240,0.75)] hover:text-[#F5F5F0] transition-colors"
+              >
+                {item.label}
+              </button>
+            ))}
             <div className="border-t border-white/10 pt-4">
               {user ? (
                 <>
