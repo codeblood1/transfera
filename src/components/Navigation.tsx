@@ -24,6 +24,8 @@ export default function Navigation() {
   };
 
   const isDashboard = location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/transfers') || location.pathname === '/profile';
+  // Hide landing-page section links when user is logged in (dashboard/profile pages)
+  const showSectionLinks = !user && !isDashboard;
 
   return (
     <nav
@@ -41,23 +43,25 @@ export default function Navigation() {
           <span className="text-lg font-medium text-[#F5F5F0]">Transfera</span>
         </Link>
 
-        {/* Desktop Nav */}
-        <div className="hidden md:flex items-center gap-8">
-          {[
-            { label: 'Features', id: 'features' },
-            { label: 'Destinations', id: 'destinations' },
-            { label: 'Security', id: 'security' },
-            { label: 'Support', id: 'support' },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors"
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        {/* Desktop Nav — section links only when NOT logged in */}
+        {showSectionLinks && (
+          <div className="hidden md:flex items-center gap-8">
+            {[
+              { label: 'Features', id: 'features' },
+              { label: 'Destinations', id: 'destinations' },
+              { label: 'Security', id: 'security' },
+              { label: 'Support', id: 'support' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}
+                className="text-xs font-medium tracking-[0.12em] uppercase text-[rgba(245,245,240,0.55)] hover:text-[#F5F5F0] transition-colors"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="hidden md:flex items-center gap-4">
           {user ? (
@@ -110,7 +114,7 @@ export default function Navigation() {
       {mobileOpen && (
         <div className="absolute top-16 left-0 right-0 bg-deep-blue/95 backdrop-blur-xl border-b border-white/10 py-6 md:hidden">
           <div className="container-padding flex flex-col gap-4">
-            {[
+            {showSectionLinks && [
               { label: 'Features', id: 'features' },
               { label: 'Destinations', id: 'destinations' },
               { label: 'Security', id: 'security' },

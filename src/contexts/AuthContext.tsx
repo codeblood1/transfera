@@ -18,7 +18,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
-  isLoading: false,
+  isLoading: true,
   isProfileLoading: false,
   signUp: async () => {},
   signIn: async () => {},
@@ -29,7 +29,7 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
@@ -44,27 +44,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Quick session check with hard timeout
-    const timer = setTimeout(() => setIsLoading(false), 30);
-    
-    try {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        clearTimeout(timer);
+    let mounted = true;
+
+    // Fast initial session check
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
         const u = session?.user ?? null;
         setUser(u);
-        if (u) fetchProfile(u.id);
-        setIsLoading(false);
-      }).catch(() => {
-        clearTimeout(timer);
-        setIsLoading(false);
-      });
-    } catch {
-      clearTimeout(timer);
-      setIsLoading(false);
-    }
+        if (u) {
+          await fetchProfile(u.id);
+        }
+      } catch {
+        // Supabase not configured - ignore
+      }
+      if (mounted) setIsLoading(false);
+    };
 
-    // Cleanup only
-    return () => clearTimeout(timer);
+    checkSession();
+
+    // Listen for auth state changes (login, logout, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) {
+        fetchProfile(u.id);
+      } else {
+        setProfile(null);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [fetchProfile]);
 
   const signUp = async (email: string, password: string, fullName: string) => {

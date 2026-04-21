@@ -129,7 +129,7 @@ function openReceipt(transfer: Transfer, profileName: string, accountNumber: str
 }
 
 export default function Dashboard() {
-  const { user, profile, refreshProfile, signOut } = useAuth();
+  const { user, profile, refreshProfile, signOut, isProfileLoading } = useAuth();
   const transferFormRef = useRef<HTMLDivElement>(null);
 
   // Tabs
@@ -355,7 +355,7 @@ export default function Dashboard() {
   const recentTransfersList = transfers.slice(0, 5);
   const recentActivityList = transactions.slice(0, 5);
 
-  if (isLoading && !profile) {
+  if ((isLoading || isProfileLoading) && !profile) {
     return (
       <div className="min-h-screen bg-[#0C1222] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
