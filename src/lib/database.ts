@@ -256,18 +256,22 @@ export async function getCountries(): Promise<Country[]> {
   })) as Country[];
 }
 
-// ==================== INTERNAL TRANSFERS ====================
+// ==================== INTERNAL TRANSFERS (via RPC) ====================
+// These use Supabase RPC calls that bypass RLS via SECURITY DEFINER
 
 export async function findAccountByNumber(accountNumber: string): Promise<{ id: string; user_id: string; account_number: string; balance: number; currency: string; status: string } | null> {
-  // Normalize: ensure TR prefix (user may enter "12345678" or "TR12345678")
-  const normalized = accountNumber.toUpperCase().startsWith('TR') ? accountNumber.toUpperCase() : 'TR' + accountNumber;
   const { data, error } = await supabase
-    .from('accounts')
-    .select('id, user_id, account_number, balance, currency, status')
-    .eq('account_number', normalized)
-    .single();
-  if (error) return null;
-  return data as { id: string; user_id: string; account_number: string; balance: number; currency: string; status: string };
+    .rpc('find_account_by_number', { acc_num: accountNumber });
+  if (error || !data || data.length === 0) return null;
+  const row = data[0];
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    account_number: row.account_number,
+    balance: parseFloat(row.balance),
+    currency: row.currency,
+    status: row.status,
+  };
 }
 
 export async function createInternalTransfer(
@@ -276,81 +280,40 @@ export async function createInternalTransfer(
   amount: number,
   description?: string
 ): Promise<Transfer | null> {
-  // 1. Find recipient account
-  const recipient = await findAccountByNumber(recipientAccountNumber);
-  if (!recipient) throw new Error('Recipient account not found. Please check the account number.');
-  if (recipient.id === senderAccountId) throw new Error('You cannot send money to yourself.');
-  if (recipient.status !== 'active') throw new Error('Recipient account is not active.');
-
-  // 2. Get sender account
-  const { data: sender } = await supabase
-    .from('accounts')
-    .select('balance, currency')
-    .eq('id', senderAccountId)
-    .single();
-  if (!sender) throw new Error('Sender account not found.');
-  if ((sender.balance as number) < amount) throw new Error('Insufficient balance.');
-
-  // 3. Create transfer record
-  const { data: transfer, error: tError } = await supabase
-    .from('transfers')
-    .insert([{
+  const { data, error } = await supabase
+    .rpc('create_internal_transfer_rpc', {
       sender_account_id: senderAccountId,
-      recipient_type: 'internal',
-      recipient_account_id: recipient.id,
-      recipient_name: `Transfera Account ${recipientAccountNumber}`,
-      recipient_country: 'US',
-      amount: amount,
-      currency: sender.currency,
-      recipient_currency: recipient.currency,
-      status: 'completed',
-      description: description || `Transfer to ${recipientAccountNumber}`,
-    }])
-    .select()
-    .single();
-  if (tError) throw new Error(tError.message);
+      recipient_account_number: recipientAccountNumber,
+      transfer_amount: amount,
+      transfer_description: description || null,
+    });
 
-  // 4. Deduct from sender
-  const newSenderBalance = (sender.balance as number) - amount;
-  const { error: sErr } = await supabase
-    .from('accounts')
-    .update({ balance: newSenderBalance, updated_at: new Date().toISOString() })
-    .eq('id', senderAccountId);
-  if (sErr) throw new Error(sErr.message);
+  if (error) {
+    throw new Error(error.message);
+  }
 
-  // 5. Credit recipient
-  const newRecipientBalance = (recipient.balance) + amount;
-  const { error: rErr } = await supabase
-    .from('accounts')
-    .update({ balance: newRecipientBalance, updated_at: new Date().toISOString() })
-    .eq('id', recipient.id);
-  if (rErr) throw new Error(rErr.message);
+  if (!data || data.length === 0) {
+    throw new Error('Transfer failed. No response from server.');
+  }
 
-  // 6. Create debit transaction for sender
-  await supabase.from('transactions').insert([{
-    account_id: senderAccountId,
-    transfer_id: transfer.id,
-    type: 'debit',
+  // Return a partial Transfer object with the key fields
+  const row = data[0];
+  return {
+    id: row.transfer_id,
+    reference_code: row.reference_code,
+    status: row.status,
     amount: amount,
-    currency: sender.currency,
-    balance_after: newSenderBalance,
-    description: `Transfer to ${recipientAccountNumber}`,
-    reference_code: transfer.reference_code,
-  }]);
-
-  // 7. Create credit transaction for recipient
-  await supabase.from('transactions').insert([{
-    account_id: recipient.id,
-    transfer_id: transfer.id,
-    type: 'credit',
-    amount: amount,
-    currency: recipient.currency,
-    balance_after: newRecipientBalance,
-    description: `Transfer from account ${senderAccountId.slice(0, 8)}...`,
-    reference_code: transfer.reference_code,
-  }]);
-
-  return transfer as Transfer;
+    currency: 'USD',
+    recipient_currency: 'USD',
+    recipient_name: `Transfera Account ${recipientAccountNumber}`,
+    recipient_type: 'internal',
+    recipient_country: 'US',
+    sender_account_id: senderAccountId,
+    recipient_account_id: '',
+    fee: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  } as Transfer;
 }
 
 // ==================== EXCHANGE RATES ====================
