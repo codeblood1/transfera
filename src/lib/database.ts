@@ -259,10 +259,12 @@ export async function getCountries(): Promise<Country[]> {
 // ==================== INTERNAL TRANSFERS ====================
 
 export async function findAccountByNumber(accountNumber: string): Promise<{ id: string; user_id: string; account_number: string; balance: number; currency: string; status: string } | null> {
+  // Normalize: ensure TR prefix (user may enter "12345678" or "TR12345678")
+  const normalized = accountNumber.toUpperCase().startsWith('TR') ? accountNumber.toUpperCase() : 'TR' + accountNumber;
   const { data, error } = await supabase
     .from('accounts')
     .select('id, user_id, account_number, balance, currency, status')
-    .eq('account_number', accountNumber)
+    .eq('account_number', normalized)
     .single();
   if (error) return null;
   return data as { id: string; user_id: string; account_number: string; balance: number; currency: string; status: string };
