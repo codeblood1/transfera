@@ -6,7 +6,7 @@ import {
   CreditCard, Shield, Globe, ChevronRight, Bell,
   Wallet, Clock, TrendingUp, Filter, Download,
   FileText, X, Eye, EyeOff, Copy, Check,
-  Building2, Users, AlertTriangle,
+  Building2, Users, AlertTriangle, Bookmark, Trash2, UserCheck,
 } from 'lucide-react';
 import {
   createTransfer,
@@ -17,9 +17,12 @@ import {
   calculateExchange,
   subscribeToTransfers,
   subscribeToTransactions,
+  getBeneficiaries,
+  saveBeneficiary,
+  deleteBeneficiary,
 } from '@/lib/database';
 import { getBankInfo } from '@/lib/bankData';
-import type { Transfer, Transaction, Country } from '@/types';
+import type { Transfer, Transaction, Country, Beneficiary } from '@/types';
 
 function formatCurrency(amount: number, currency: string): string {
   try {
@@ -157,6 +160,11 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string; sub?: string } | null>(null);
 
+  // Beneficiary state
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [saveAsBeneficiary, setSaveAsBeneficiary] = useState(false);
+  const [saveAsBeneficiaryInt, setSaveAsBeneficiaryInt] = useState(false);
+
   // Modals
   const [showAddFundsModal, setShowAddFundsModal] = useState(false);
   const [showCardsModal, setShowCardsModal] = useState(false);
@@ -180,7 +188,16 @@ export default function Dashboard() {
     setIsLoading(false);
   }, [profile?.account?.id]);
 
+  const fetchBeneficiaries = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const bData = await getBeneficiaries(user.id);
+      setBeneficiaries(bData);
+    } catch { /* silent */ }
+  }, [user?.id]);
+
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchBeneficiaries(); }, [fetchBeneficiaries]);
 
   useEffect(() => {
     if (!profile?.account?.id) return;
@@ -203,8 +220,9 @@ export default function Dashboard() {
   const currency = profile?.account?.currency ?? 'USD';
   const myAccountNumber = profile?.account?.account_number ?? '';
   const pendingAmount = transfers.filter(t => t.status === 'pending').reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0), 0);
+  const pendingFees = transfers.filter(t => t.status === 'pending').reduce((sum, t) => sum + (typeof t.fee === 'number' ? t.fee : 0), 0);
   const pendingCount = transfers.filter(t => t.status === 'pending').length;
-  const availableBalance = balance - pendingAmount;
+  const availableBalance = balance - pendingAmount - pendingFees;
 
   // ── Transfer Limits ──
   const DAILY_LIMIT = 30000;
@@ -212,8 +230,8 @@ export default function Dashboard() {
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
 
-  const dailySent = transfers.filter(t => { const d = new Date(t.created_at); return d >= todayStart && (t.status === 'completed' || t.status === 'pending'); }).reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0), 0);
-  const monthlySent = transfers.filter(t => { const d = new Date(t.created_at); return d >= monthStart && (t.status === 'completed' || t.status === 'pending'); }).reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0), 0);
+  const dailySent = transfers.filter(t => { const d = new Date(t.created_at); return d >= todayStart && (t.status === 'completed' || t.status === 'pending'); }).reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0) + (typeof t.fee === 'number' ? t.fee : 0), 0);
+  const monthlySent = transfers.filter(t => { const d = new Date(t.created_at); return d >= monthStart && (t.status === 'completed' || t.status === 'pending'); }).reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0) + (typeof t.fee === 'number' ? t.fee : 0), 0);
   const dailyRemaining = Math.max(0, DAILY_LIMIT - dailySent);
   const monthlyRemaining = Math.max(0, MONTHLY_LIMIT - monthlySent);
   const dailyPct = Math.min((dailySent / DAILY_LIMIT) * 100, 100);
@@ -232,8 +250,9 @@ export default function Dashboard() {
     if (!profile?.account?.id) return;
     const amt = parseFloat(amount);
     if (!recipientName.trim() || !amt || amt <= 0) return;
-    if (amt > dailyRemaining) { setToast({ type: 'error', message: 'Daily Limit Exceeded', sub: `You can only send up to ${formatCurrency(dailyRemaining, currency)} today.` }); return; }
-    if (amt > availableBalance) { setToast({ type: 'error', message: 'Insufficient Balance', sub: `Your available balance is ${formatCurrency(availableBalance, currency)}.` }); return; }
+    const totalWithFee = amt + 10;
+    if (totalWithFee > dailyRemaining) { setToast({ type: 'error', message: 'Daily Limit Exceeded', sub: `You can only send up to ${formatCurrency(Math.max(0, dailyRemaining - 10), currency)} (plus $10 fee) today.` }); return; }
+    if (totalWithFee > availableBalance) { setToast({ type: 'error', message: 'Insufficient Balance', sub: `Your available balance is ${formatCurrency(availableBalance, currency)} (includes $10 fee).` }); return; }
 
     setIsSubmitting(true);
     try {
@@ -244,6 +263,7 @@ export default function Dashboard() {
         recipient_name: recipientName.trim(),
         recipient_country: selectedCountry?.code || country,
         amount: amt,
+        fee: 10,
         currency: currency,
         recipient_currency: selectedCountry?.currency_code || currency,
         recipient_bank_name: bank || undefined,
@@ -253,7 +273,21 @@ export default function Dashboard() {
       });
       if (result) {
         setToast({ type: 'success', message: 'Transfer Initiated!', sub: `Reference: ${result.reference_code}. Pending admin approval.` });
-        setRecipientName(''); setCountry('US'); setBank(''); setAccountNumberExt(''); setRoutingNumber(''); setAmount(''); setDescription('');
+        // Save beneficiary if checked
+        if (saveAsBeneficiary && user?.id) {
+          await saveBeneficiary(user.id, {
+            name: recipientName.trim(),
+            account_number: accountNumberExt.trim() || undefined,
+            bank_name: bank || undefined,
+            country: selectedCountry?.code || country,
+            country_name: selectedCountry?.name,
+            currency: selectedCountry?.currency_code || currency,
+            routing_number: routingNumber.trim() || undefined,
+            recipient_type: 'external_bank',
+          });
+          fetchBeneficiaries();
+        }
+        setRecipientName(''); setCountry('US'); setBank(''); setAccountNumberExt(''); setRoutingNumber(''); setAmount(''); setDescription(''); setSaveAsBeneficiary(false);
         fetchData(); refreshProfile();
       }
     } catch (err: unknown) { setToast({ type: 'error', message: 'Transfer Failed', sub: err instanceof Error ? err.message : 'Please try again.' }); }
@@ -279,11 +313,44 @@ export default function Dashboard() {
       );
       if (result) {
         setToast({ type: 'success', message: 'Transfer Completed!', sub: `${formatCurrency(amt, currency)} sent to ${internalAccountNum.trim().toUpperCase()}. Ref: ${result.reference_code}` });
-        setInternalAccountNum(''); setInternalAmount(''); setInternalDescription('');
+        // Save beneficiary if checked
+        if (saveAsBeneficiaryInt && user?.id) {
+          await saveBeneficiary(user.id, {
+            name: `Transfera ${internalAccountNum.trim().toUpperCase()}`,
+            account_number: internalAccountNum.trim().toUpperCase(),
+            country: 'US',
+            country_name: 'United States',
+            currency: currency,
+            recipient_type: 'internal',
+          });
+          fetchBeneficiaries();
+        }
+        setInternalAccountNum(''); setInternalAmount(''); setInternalDescription(''); setSaveAsBeneficiaryInt(false);
         fetchData(); refreshProfile();
       }
     } catch (err: unknown) { setToast({ type: 'error', message: 'Transfer Failed', sub: err instanceof Error ? err.message : 'Please try again.' }); }
     setIsSubmitting(false);
+  };
+
+  // Select a saved beneficiary to auto-fill the form
+  const selectBeneficiary = (b: Beneficiary) => {
+    if (b.recipient_type === 'internal') {
+      setTransferType('internal');
+      setInternalAccountNum(b.account_number || '');
+    } else {
+      setTransferType('external');
+      setRecipientName(b.name);
+      setCountry(b.country);
+      setBank(b.bank_name || '');
+      setAccountNumberExt(b.account_number || '');
+      setRoutingNumber(b.routing_number || '');
+    }
+    setActiveTab('send');
+    transferFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleDeleteBeneficiary = async (id: string) => {
+    try { await deleteBeneficiary(id); fetchBeneficiaries(); } catch { /* silent */ }
   };
 
   // Exchange
@@ -521,10 +588,19 @@ export default function Dashboard() {
                         {amount && parseFloat(amount) > 0 && (
                           <div className="bg-[#D4A853]/5 border border-[#D4A853]/10 rounded-2xl p-5 space-y-3">
                             <div className="flex justify-between"><span className="text-sm text-[#F5F5F0]/50">You send</span><span className="text-sm font-mono text-[#F5F5F0]">{formatCurrency(parseFloat(amount), currency)}</span></div>
-                            <div className="flex justify-between"><span className="text-sm text-[#F5F5F0]/50">Fee</span><span className="text-sm font-mono text-emerald-400">Free</span></div>
-                            <div className="border-t border-white/10 pt-3 flex justify-between"><span className="text-sm font-medium text-[#F5F5F0]">Total</span><span className="text-lg font-mono font-bold text-[#D4A853]">{formatCurrency(parseFloat(amount), currency)}</span></div>
+                            <div className="flex justify-between"><span className="text-sm text-[#F5F5F0]/50">Fee</span><span className="text-sm font-mono text-[#F5F5F0]/70">{formatCurrency(10, currency)}</span></div>
+                            <div className="border-t border-white/10 pt-3 flex justify-between"><span className="text-sm font-medium text-[#F5F5F0]">Total deducted</span><span className="text-lg font-mono font-bold text-[#D4A853]">{formatCurrency(parseFloat(amount) + 10, currency)}</span></div>
                           </div>
                         )}
+
+                        {/* Save as beneficiary checkbox */}
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                          <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${saveAsBeneficiary ? 'bg-[#D4A853] border-[#D4A853]' : 'border-white/20 group-hover:border-white/40'}`}>
+                            {saveAsBeneficiary && <Check className="w-3.5 h-3.5 text-[#0C1222]" />}
+                            <input type="checkbox" checked={saveAsBeneficiary} onChange={e => setSaveAsBeneficiary(e.target.checked)} className="sr-only" />
+                          </div>
+                          <div className="flex items-center gap-2"><Bookmark className="w-4 h-4 text-[#D4A853]/60" /><span className="text-sm text-[#F5F5F0]/50 group-hover:text-[#F5F5F0]/70 transition-colors">Save as beneficiary</span></div>
+                        </label>
 
                         <button type="submit" disabled={isSubmitting || limitReached} className="w-full py-4 rounded-xl bg-[#D4A853] text-[#0C1222] font-semibold hover:bg-[#D4A853]/90 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
                           {isSubmitting ? <><div className="w-4 h-4 border-2 border-[#0C1222] border-t-transparent rounded-full animate-spin" />Processing...</> : <><Send className="w-4 h-4" /> Initiate Transfer</>}
@@ -579,6 +655,15 @@ export default function Dashboard() {
                             <div className="border-t border-white/10 pt-3 flex justify-between"><span className="text-sm font-medium text-[#F5F5F0]">Recipient gets</span><span className="text-lg font-mono font-bold text-[#D4A853]">{formatCurrency(parseFloat(internalAmount), currency)}</span></div>
                           </div>
                         )}
+
+                        {/* Save as beneficiary checkbox */}
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                          <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${saveAsBeneficiaryInt ? 'bg-[#D4A853] border-[#D4A853]' : 'border-white/20 group-hover:border-white/40'}`}>
+                            {saveAsBeneficiaryInt && <Check className="w-3.5 h-3.5 text-[#0C1222]" />}
+                            <input type="checkbox" checked={saveAsBeneficiaryInt} onChange={e => setSaveAsBeneficiaryInt(e.target.checked)} className="sr-only" />
+                          </div>
+                          <div className="flex items-center gap-2"><Bookmark className="w-4 h-4 text-[#D4A853]/60" /><span className="text-sm text-[#F5F5F0]/50 group-hover:text-[#F5F5F0]/70 transition-colors">Save as beneficiary</span></div>
+                        </label>
 
                         <button type="submit" disabled={isSubmitting || limitReached} className="w-full py-4 rounded-xl bg-emerald-500 text-[#0C1222] font-semibold hover:bg-emerald-400 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
                           {isSubmitting ? <><div className="w-4 h-4 border-2 border-[#0C1222] border-t-transparent rounded-full animate-spin" />Sending...</> : <><Send className="w-4 h-4" /> Send Instantly</>}
@@ -681,6 +766,37 @@ export default function Dashboard() {
                   <div className="flex justify-between text-sm mb-2"><span className="text-[#F5F5F0]/50">Monthly ({formatCurrency(monthlySent, currency)})</span><span className="text-[#F5F5F0] font-mono">{formatCurrency(MONTHLY_LIMIT, currency)}</span></div>
                   <div className="h-2 bg-white/5 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all duration-500 ${monthlyPct >= 100 ? 'bg-red-500' : 'bg-gradient-to-r from-[#D4A853] to-[#B08A3E]'}`} style={{ width: `${monthlyPct}%` }} /></div>
                 </div>
+              </div>
+            </div>
+
+            {/* Saved Beneficiaries */}
+            <div className="bg-gradient-to-br from-[#1B2132] to-[#14192A] rounded-3xl border border-white/5 overflow-hidden">
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bookmark className="w-4 h-4 text-[#D4A853]" />
+                  <h3 className="text-sm font-semibold text-[#F5F5F0]/60 uppercase tracking-wider">Saved Beneficiaries</h3>
+                </div>
+                <span className="text-xs text-[#F5F5F0]/30">{beneficiaries.length}</span>
+              </div>
+              <div className="p-4 space-y-2 max-h-[280px] overflow-y-auto">
+                {beneficiaries.length === 0 ? (
+                  <div className="text-center py-4"><p className="text-xs text-[#F5F5F0]/30">No saved beneficiaries yet.</p><p className="text-xs text-[#F5F5F0]/20 mt-1">Check "Save as beneficiary" when sending.</p></div>
+                ) : beneficiaries.map(b => (
+                  <div key={b.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/5 transition-all group">
+                    <button onClick={() => selectBeneficiary(b)} className="flex items-center gap-3 flex-1 text-left min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#D4A853]/20 to-[#B08A3E]/20 flex items-center justify-center border border-[#D4A853]/20 shrink-0">
+                        {b.recipient_type === 'internal' ? <UserCheck className="w-4 h-4 text-[#D4A853]" /> : <Building2 className="w-4 h-4 text-[#D4A853]" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[#F5F5F0] truncate">{b.name}</p>
+                        <p className="text-xs text-[#F5F5F0]/30 truncate">{b.recipient_type === 'internal' ? b.account_number : `${b.bank_name || b.country} ${b.account_number ? '· ' + b.account_number.slice(-4) : ''}`}</p>
+                      </div>
+                    </button>
+                    <button onClick={() => handleDeleteBeneficiary(b.id)} className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-[#F5F5F0]/20 hover:bg-red-500/10 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
 

@@ -1,7 +1,8 @@
 import { supabase } from './supabase';
 import type {
   Profile, Account, Transfer, Transaction, Country,
-  ExchangeRate, UserProfile, AccountStats, ExchangeCalculation
+  ExchangeRate, UserProfile, AccountStats, ExchangeCalculation,
+  Beneficiary
 } from '@/types';
 
 // ==================== AUTH ====================
@@ -299,6 +300,7 @@ export async function createInternalTransfer(
 
   // Return a partial Transfer object with the key fields
   const row = data[0];
+  const recName = row.recipient_name || `Transfera Account ${recipientAccountNumber}`;
   return {
     id: row.transfer_id,
     reference_code: row.reference_code,
@@ -306,7 +308,7 @@ export async function createInternalTransfer(
     amount: amount,
     currency: 'USD',
     recipient_currency: 'USD',
-    recipient_name: `Transfera Account ${recipientAccountNumber}`,
+    recipient_name: recName,
     recipient_type: 'internal',
     recipient_country: 'US',
     sender_account_id: senderAccountId,
@@ -315,6 +317,51 @@ export async function createInternalTransfer(
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   } as Transfer;
+}
+
+// ==================== BENEFICIARIES ====================
+
+export async function getBeneficiaries(userId: string): Promise<Beneficiary[]> {
+  const { data, error } = await supabase
+    .from('beneficiaries')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) return [];
+  return (data || []) as Beneficiary[];
+}
+
+export async function saveBeneficiary(
+  userId: string,
+  beneficiary: {
+    name: string;
+    account_number?: string;
+    bank_name?: string;
+    bank_code?: string;
+    country: string;
+    country_name?: string;
+    currency?: string;
+    routing_number?: string;
+    recipient_type?: 'internal' | 'external_bank' | 'mobile_wallet' | 'cash_pickup';
+    recipient_email?: string;
+    recipient_phone?: string;
+  }
+): Promise<Beneficiary | null> {
+  const { data, error } = await supabase
+    .from('beneficiaries')
+    .insert([{ user_id: userId, ...beneficiary }])
+    .select()
+    .single();
+  if (error) return null;
+  return data as Beneficiary;
+}
+
+export async function deleteBeneficiary(beneficiaryId: string): Promise<void> {
+  const { error } = await supabase
+    .from('beneficiaries')
+    .delete()
+    .eq('id', beneficiaryId);
+  if (error) throw error;
 }
 
 // ==================== EXCHANGE RATES ====================
