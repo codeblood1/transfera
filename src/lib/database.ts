@@ -208,10 +208,11 @@ export async function createTransfer(input: CreateTransferInput): Promise<Transf
 }
 
 export async function getTransfers(accountId: string, status?: string, limit = 50): Promise<Transfer[]> {
+  // Fetch transfers where user is EITHER sender OR recipient (internal transfers)
   let query = supabase
     .from('transfers')
     .select('*')
-    .eq('sender_account_id', accountId)
+    .or(`sender_account_id.eq.${accountId},recipient_account_id.eq.${accountId}`)
     .order('created_at', { ascending: false })
     .limit(limit);
   if (status) query = query.eq('status', status);
@@ -225,7 +226,7 @@ export async function getTransferById(transferId: string, accountId: string): Pr
     .from('transfers')
     .select('*')
     .eq('id', transferId)
-    .eq('sender_account_id', accountId)
+    .or(`sender_account_id.eq.${accountId},recipient_account_id.eq.${accountId}`)
     .single();
   if (error) return null;
   return data as Transfer;
@@ -236,7 +237,7 @@ export async function cancelTransfer(transferId: string, accountId: string): Pro
     .from('transfers')
     .update({ status: 'rejected', rejection_reason: 'Cancelled by user' })
     .eq('id', transferId)
-    .eq('sender_account_id', accountId)
+    .or(`sender_account_id.eq.${accountId},recipient_account_id.eq.${accountId}`)
     .eq('status', 'pending');
   if (error) throw error;
 }
@@ -348,14 +349,25 @@ export async function calculateExchange(from: string, to: string, amount: number
 // ==================== REALTIME ====================
 
 export function subscribeToTransfers(accountId: string, callback: () => void) {
-  return supabase
+  const channel = supabase
     .channel('transfers')
     .on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'transfers', filter: `sender_account_id=eq.${accountId}` },
       callback
     )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'transfers', filter: `sender_account_id=eq.${accountId}` },
+      callback
+    )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'transfers', filter: `recipient_account_id=eq.${accountId}` },
+      callback
+    )
     .subscribe();
+  return { unsubscribe: () => { supabase.removeChannel(channel); } };
 }
 
 export function subscribeToTransactions(accountId: string, callback: () => void) {
