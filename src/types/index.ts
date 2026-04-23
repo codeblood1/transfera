@@ -117,3 +117,20 @@ export interface ExchangeCalculation {
   from_currency: string;
   to_currency: string;
 }
+
+export interface Beneficiary {
+  id: string;
+  user_id: string;
+  name: string;
+  account_number: string | null;
+  bank_name: string | null;
+  bank_code: string | null;
+  country: string;
+  country_name: string | null;
+  currency: string;
+  routing_number: string | null;
+  recipient_type: 'internal' | 'external_bank' | 'mobile_wallet' | 'cash_pickup';
+  recipient_email: string | null;
+  recipient_phone: string | null;
+  created_at: string;
+}
