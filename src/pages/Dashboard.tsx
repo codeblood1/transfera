@@ -20,7 +20,10 @@ import {
   getBeneficiaries,
   saveBeneficiary,
   deleteBeneficiary,
+  getUserEmailByAccount,
+  findAccountByNumber,
 } from '@/lib/database';
+import { sendEmail, buildDebitAlertHTML, buildCreditAlertHTML } from '@/lib/emailService';
 import { getBankInfo } from '@/lib/bankData';
 import type { Transfer, Transaction, Country, Beneficiary } from '@/types';
 
@@ -273,6 +276,27 @@ export default function Dashboard() {
       });
       if (result) {
         setToast({ type: 'success', message: 'Transfer Initiated!', sub: `Reference: ${result.reference_code}. Pending admin approval.` });
+
+        // Send debit alert email to sender
+        if (user?.email) {
+          const newBal = availableBalance - amt - 10;
+          sendEmail({
+            to: user.email,
+            subject: `Transfera Debit Alert — ${formatCurrency(amt + 10, currency)}`,
+            html: buildDebitAlertHTML({
+              senderName: profileName,
+              recipientName: recipientName.trim(),
+              amount: amt,
+              currency,
+              fee: 10,
+              referenceCode: result.reference_code,
+              date: new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+              transferType: `External Bank — ${bank || selectedCountry?.name || country}`,
+              newBalance: newBal,
+            }),
+          });
+        }
+
         // Save beneficiary if checked
         if (saveAsBeneficiary && user?.id) {
           await saveBeneficiary(user.id, {
@@ -305,14 +329,56 @@ export default function Dashboard() {
 
     setIsSubmitting(true);
     try {
-      const result = await createInternalTransfer(
+      const { transfer: result } = await createInternalTransfer(
         profile.account.id,
         internalAccountNum.trim().toUpperCase(),
         amt,
         internalDescription.trim() || undefined
       );
       if (result) {
-        setToast({ type: 'success', message: 'Transfer Completed!', sub: `${formatCurrency(amt, currency)} sent to ${internalAccountNum.trim().toUpperCase()}. Ref: ${result.reference_code}` });
+        const recipientAcct = internalAccountNum.trim().toUpperCase();
+        const recName = result.recipient_name || `Transfera Account ${recipientAcct}`;
+        setToast({ type: 'success', message: 'Transfer Completed!', sub: `${formatCurrency(amt, currency)} sent to ${recName}. Ref: ${result.reference_code}` });
+
+        // Send debit alert to sender
+        if (user?.email) {
+          const newBal = availableBalance - amt;
+          sendEmail({
+            to: user.email,
+            subject: `Transfera Debit Alert — ${formatCurrency(amt, currency)} sent`,
+            html: buildDebitAlertHTML({
+              senderName: profileName,
+              recipientName: recName,
+              amount: amt,
+              currency,
+              fee: 0,
+              referenceCode: result.reference_code,
+              date: new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+              transferType: 'Transfera Internal',
+              newBalance: newBal,
+            }),
+          });
+        }
+
+        // Send credit alert to recipient
+        const recipientEmail = await getUserEmailByAccount(recipientAcct);
+        if (recipientEmail) {
+          const recAcctData = await findAccountByNumber(recipientAcct);
+          sendEmail({
+            to: recipientEmail,
+            subject: `Transfera Credit Alert — ${formatCurrency(amt, currency)} received`,
+            html: buildCreditAlertHTML({
+              recipientName: recName.split(' (')[0] || 'Transfera User',
+              senderName: profileName,
+              amount: amt,
+              currency,
+              referenceCode: result.reference_code,
+              date: new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+              newBalance: recAcctData?.balance || amt,
+            }),
+          });
+        }
+
         // Save beneficiary if checked
         if (saveAsBeneficiaryInt && user?.id) {
           await saveBeneficiary(user.id, {

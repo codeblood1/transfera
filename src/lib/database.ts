@@ -281,7 +281,7 @@ export async function createInternalTransfer(
   recipientAccountNumber: string,
   amount: number,
   description?: string
-): Promise<Transfer | null> {
+): Promise<{ transfer: Transfer; recipientUserId?: string }> {
   const { data, error } = await supabase
     .rpc('create_internal_transfer_rpc', {
       sender_account_id: senderAccountId,
@@ -298,10 +298,9 @@ export async function createInternalTransfer(
     throw new Error('Transfer failed. No response from server.');
   }
 
-  // Return a partial Transfer object with the key fields
   const row = data[0];
   const recName = row.recipient_name || `Transfera Account ${recipientAccountNumber}`;
-  return {
+  const transfer = {
     id: row.transfer_id,
     reference_code: row.reference_code,
     status: row.status,
@@ -309,7 +308,7 @@ export async function createInternalTransfer(
     currency: 'USD',
     recipient_currency: 'USD',
     recipient_name: recName,
-    recipient_type: 'internal',
+    recipient_type: 'internal' as const,
     recipient_country: 'US',
     sender_account_id: senderAccountId,
     recipient_account_id: '',
@@ -317,6 +316,15 @@ export async function createInternalTransfer(
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   } as Transfer;
+
+  return { transfer, recipientUserId: row.recipient_user_id };
+}
+
+export async function getUserEmailByAccount(accountNumber: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .rpc('get_user_email_by_account', { acc_num: accountNumber });
+  if (error || !data || data.length === 0) return null;
+  return data[0].email;
 }
 
 // ==================== BENEFICIARIES ====================
