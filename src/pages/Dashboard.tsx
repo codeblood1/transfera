@@ -49,37 +49,65 @@ function generateVirtualCard(accountNumber: string) {
 }
 
 function generateReceiptHTML(transfer: Transfer, profileName: string, accountNumber: string): string {
+  const statusColor = transfer.status === 'completed' ? '#065f46' : transfer.status === 'pending' ? '#92400e' : '#991b1b';
+  const statusBg = transfer.status === 'completed' ? '#d1fae5' : transfer.status === 'pending' ? '#fef3c7' : '#fee2e2';
   return `
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Receipt - ${transfer.reference_code}</title>
 <style>
+*{box-sizing:border-box;}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f5f5;margin:0;padding:40px 20px;}
 .receipt{max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
 .header{text-align:center;border-bottom:2px solid #D4A853;padding-bottom:24px;margin-bottom:24px;}
 .header h1{color:#0C1222;font-size:24px;margin:0 0 8px;}
 .header p{color:#666;font-size:14px;margin:0;}
 .status{display:inline-block;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;text-transform:uppercase;}
-.status.completed{background:#d1fae5;color:#065f46;}.status.pending{background:#fef3c7;color:#92400e;}
-.row{display:flex;justify-content:space-between;padding:14px 0;border-bottom:1px solid #f0f0f0;}
-.label{color:#888;font-size:13px;}.value{color:#0C1222;font-size:14px;font-weight:500;}
-.amount{font-size:28px;font-weight:700;color:#0C1222;text-align:center;margin:24px 0;}
+.section-title{font-size:11px;font-weight:600;text-transform:uppercase;color:#999;letter-spacing:0.08em;margin:20px 0 12px;padding-bottom:6px;border-bottom:1px solid #eee;}
+.row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f5f5f5;}
+.label{color:#888;font-size:13px;}.value{color:#0C1222;font-size:13px;font-weight:500;text-align:right;max-width:60%;}
+.amount{font-size:32px;font-weight:700;color:#0C1222;text-align:center;margin:24px 0 8px;}
+.sub-amount{text-align:center;color:#888;font-size:13px;margin-bottom:24px;}
 .footer{text-align:center;margin-top:32px;padding-top:24px;border-top:1px solid #eee;color:#999;font-size:12px;}
 .logo{width:48px;height:48px;background:#D4A853;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;}
-@media print{body{background:white;padding:0;}.receipt{box-shadow:none;max-width:100%;}}
+.print-btn{display:block;width:100%;padding:12px;margin-top:20px;background:#0C1222;color:white;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
+@media print{body{background:white;padding:0;}.receipt{box-shadow:none;max-width:100%;}.print-btn{display:none;}}
 </style></head><body>
-<div class="receipt"><div class="header"><div class="logo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0C1222" stroke-width="2.5"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></div>
-<h1>Transfer Receipt</h1><p>Transfera &middot; ${transfer.reference_code}</p></div>
-<div style="text-align:center;margin:16px 0;"><span class="status ${transfer.status}">${transfer.status}</span></div>
-<div class="amount">${formatCurrency(transfer.amount, transfer.currency)}</div>
-<div class="row"><span class="label">Reference</span><span class="value">${transfer.reference_code}</span></div>
-<div class="row"><span class="label">Date</span><span class="value">${new Date(transfer.created_at).toLocaleString('en-US',{month:'long',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span></div>
-<div class="row"><span class="label">Sender</span><span class="value">${profileName} &middot; ${accountNumber}</span></div>
-<div class="row"><span class="label">Recipient</span><span class="value">${transfer.recipient_name}</span></div>
-<div class="row"><span class="label">Type</span><span class="value">${transfer.recipient_type.replace('_',' ')}</span></div>
-<div class="row"><span class="label">Amount</span><span class="value">${formatCurrency(transfer.amount,transfer.currency)}</span></div>
-<div class="row"><span class="label">Fee</span><span class="value">${transfer.fee>0?formatCurrency(transfer.fee,transfer.currency):'Free'}</span></div>
-<div class="row"><span class="label">Description</span><span class="value">${transfer.description||'-'}</span></div>
-<div class="footer"><p>Thank you for using Transfera</p></div></div>
+<div class="receipt">
+  <div class="header"><div class="logo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0C1222" stroke-width="2.5"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></div>
+  <h1>Transfer Receipt</h1><p>Transfera &middot; ${transfer.reference_code}</p></div>
+  <div style="text-align:center;margin:16px 0;"><span class="status" style="background:${statusBg};color:${statusColor};">${transfer.status.toUpperCase()}</span></div>
+  <div class="amount">${formatCurrency(transfer.amount, transfer.currency)}</div>
+  <div class="sub-amount">${transfer.recipient_currency !== transfer.currency && transfer.converted_amount ? 'Recipient receives: ' + formatCurrency(transfer.converted_amount, transfer.recipient_currency) : ''}</div>
+
+  <div class="section-title">Transfer Details</div>
+  <div class="row"><span class="label">Reference Code</span><span class="value">${transfer.reference_code}</span></div>
+  <div class="row"><span class="label">Date & Time</span><span class="value">${new Date(transfer.created_at).toLocaleString('en-US',{month:'long',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span></div>
+  <div class="row"><span class="label">Transfer Type</span><span class="value">${transfer.recipient_type === 'internal' ? 'Transfera Internal' : 'External Bank Transfer'}</span></div>
+  <div class="row"><span class="label">Currency</span><span class="value">${transfer.currency}</span></div>
+  ${transfer.exchange_rate ? `<div class="row"><span class="label">Exchange Rate</span><span class="value">1 ${transfer.currency} = ${transfer.exchange_rate} ${transfer.recipient_currency}</span></div>` : ''}
+  <div class="row"><span class="label">Description</span><span class="value">${transfer.description || '-'}</span></div>
+
+  <div class="section-title">Sender Information</div>
+  <div class="row"><span class="label">Sender Name</span><span class="value">${profileName}</span></div>
+  <div class="row"><span class="label">Account Number</span><span class="value">${accountNumber}</span></div>
+
+  <div class="section-title">Recipient Information</div>
+  <div class="row"><span class="label">Recipient Name</span><span class="value">${transfer.recipient_name}</span></div>
+  ${transfer.recipient_bank_name ? `<div class="row"><span class="label">Bank Name</span><span class="value">${transfer.recipient_bank_name}</span></div>` : ''}
+  ${transfer.recipient_account_number ? `<div class="row"><span class="label">Account Number</span><span class="value">${transfer.recipient_account_number}</span></div>` : ''}
+  ${transfer.recipient_routing_number ? `<div class="row"><span class="label">Routing / Sort Code</span><span class="value">${transfer.recipient_routing_number}</span></div>` : ''}
+  <div class="row"><span class="label">Country</span><span class="value">${transfer.recipient_country}</span></div>
+  ${transfer.recipient_currency !== transfer.currency ? `<div class="row"><span class="label">Recipient Currency</span><span class="value">${transfer.recipient_currency}</span></div>` : ''}
+
+  <div class="section-title">Payment Breakdown</div>
+  <div class="row"><span class="label">Transfer Amount</span><span class="value">${formatCurrency(transfer.amount, transfer.currency)}</span></div>
+  <div class="row"><span class="label">Fee</span><span class="value">${transfer.fee > 0 ? formatCurrency(transfer.fee, transfer.currency) : '<span style="color:#065f46;">Free</span>'}</span></div>
+  ${transfer.fee > 0 ? `<div class="row"><span class="label">Total Deducted</span><span class="value" style="font-weight:700;">${formatCurrency(transfer.amount + transfer.fee, transfer.currency)}</span></div>` : ''}
+  ${transfer.completed_at ? `<div class="row"><span class="label">Completed</span><span class="value">${new Date(transfer.completed_at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span></div>` : ''}
+
+  <div class="footer"><p>Thank you for using Transfera</p><p>support@transfera.com</p></div>
+  <button class="print-btn" onclick="window.print()">🖨 Print Receipt</button>
+</div>
 </body></html>`;
 }
 
