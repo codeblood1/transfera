@@ -220,21 +220,14 @@ export default function Dashboard() {
 
   // Generate notifications from transfer data
   useEffect(() => {
-    console.log('[NOTIF] profile?.account?.id:', profile?.account?.id, 'transfers.length:', transfers.length);
-    if (!profile?.account?.id) {
-      console.log('[NOTIF] No account ID, skipping');
-      return;
-    }
+    if (!profile?.account?.id) return;
     if (transfers.length === 0) {
-      console.log('[NOTIF] No transfers, clearing notifications');
       setNotifications([]);
       return;
     }
     const myAccountId = profile.account.id;
-    console.log('[NOTIF] Generating notifications for', transfers.length, 'transfers');
     const notifs: Notification[] = transfers.slice(0, 20).map(t => {
       const isDebit = t.sender_account_id === myAccountId;
-      console.log('[NOTIF] Transfer', t.id, 'sender:', t.sender_account_id, 'me:', myAccountId, 'isDebit:', isDebit);
       if (isDebit) {
         return {
           id: `debit-${t.id}`,
@@ -263,9 +256,7 @@ export default function Dashboard() {
     });
     setNotifications(prev => {
       const readMap = new Map(prev.filter(n => n.read).map(n => [n.id, true]));
-      const merged = notifs.map(n => ({ ...n, read: readMap.has(n.id) || n.read }));
-      console.log('[NOTIF] Generated', merged.length, 'notifications');
-      return merged;
+      return notifs.map(n => ({ ...n, read: readMap.has(n.id) || n.read }));
     });
   }, [transfers, profile?.account?.id]);
 
@@ -555,13 +546,18 @@ export default function Dashboard() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
-            {/* Notification Bell */}
+            {/* Notification Bell — highly visible solid gold button */}
             <div className="relative">
-              <button onClick={() => setShowNotifications(!showNotifications)} className="relative w-10 h-10 rounded-xl bg-[#D4A853]/15 border border-[#D4A853]/30 flex items-center justify-center text-[#D4A853] hover:bg-[#D4A853]/25 transition-all">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative flex items-center gap-2 px-3 py-2 rounded-xl bg-[#D4A853] text-[#0C1222] hover:bg-[#c49a48] transition-all font-medium"
+                title="Notifications"
+              >
                 <Bell className="w-5 h-5" />
+                <span className="hidden sm:inline text-sm font-semibold">Alerts</span>
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] bg-red-500 rounded-full flex items-center justify-center px-1 border-2 border-[#0C1222]">
-                    <span className="text-[10px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                  <span className="absolute -top-2 -right-2 min-w-[22px] h-[22px] bg-red-500 rounded-full flex items-center justify-center px-1 border-2 border-[#0C1222] animate-pulse">
+                    <span className="text-[11px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>
                   </span>
                 )}
               </button>
