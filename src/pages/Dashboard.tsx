@@ -184,6 +184,27 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // localStorage key for read notifications
+  const readNotifKey = user?.id ? `transfera_read_notifs_${user.id}` : null;
+
+  // Load read notification IDs from localStorage
+  const loadReadIds = useCallback((): Set<string> => {
+    if (!readNotifKey) return new Set();
+    try {
+      const raw = localStorage.getItem(readNotifKey);
+      if (raw) return new Set(JSON.parse(raw));
+    } catch { /* ignore */ }
+    return new Set();
+  }, [readNotifKey]);
+
+  // Save read notification IDs to localStorage
+  const saveReadIds = useCallback((ids: Set<string>) => {
+    if (!readNotifKey) return;
+    try {
+      localStorage.setItem(readNotifKey, JSON.stringify([...ids]));
+    } catch { /* ignore */ }
+  }, [readNotifKey]);
+
   // Modals
   const [showAddFundsModal, setShowAddFundsModal] = useState(false);
   const [showCardsModal, setShowCardsModal] = useState(false);
@@ -226,6 +247,7 @@ export default function Dashboard() {
       return;
     }
     const myAccountId = profile.account.id;
+    const readIds = loadReadIds();
     const notifs: Notification[] = transfers.slice(0, 20).map(t => {
       const isDebit = t.sender_account_id === myAccountId;
       if (isDebit) {
@@ -237,7 +259,7 @@ export default function Dashboard() {
           amount: t.amount,
           currency: t.currency,
           referenceCode: t.reference_code,
-          read: false,
+          read: readIds.has(`debit-${t.id}`),
           createdAt: t.created_at,
         };
       } else {
@@ -245,20 +267,17 @@ export default function Dashboard() {
           id: `credit-${t.id}`,
           type: 'credit' as const,
           title: 'Money Received',
-          message: `You received ${formatCurrency(t.amount, t.currency)} from ${t.recipient_name}`,
+          message: `You received ${formatCurrency(t.amount, t.currency)}`,
           amount: t.amount,
           currency: t.currency,
           referenceCode: t.reference_code,
-          read: false,
+          read: readIds.has(`credit-${t.id}`),
           createdAt: t.created_at,
         };
       }
     });
-    setNotifications(prev => {
-      const readMap = new Map(prev.filter(n => n.read).map(n => [n.id, true]));
-      return notifs.map(n => ({ ...n, read: readMap.has(n.id) || n.read }));
-    });
-  }, [transfers, profile?.account?.id]);
+    setNotifications(notifs);
+  }, [transfers, profile?.account?.id, loadReadIds]);
 
   useEffect(() => {
     if (!profile?.account?.id) return;
@@ -492,10 +511,20 @@ export default function Dashboard() {
 
   const markNotificationRead = (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    // Persist to localStorage
+    const readIds = loadReadIds();
+    readIds.add(id);
+    saveReadIds(readIds);
   };
 
   const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setNotifications(prev => {
+      const allIds = prev.map(n => n.id);
+      const readIds = loadReadIds();
+      allIds.forEach(id => readIds.add(id));
+      saveReadIds(readIds);
+      return prev.map(n => ({ ...n, read: true }));
+    });
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
