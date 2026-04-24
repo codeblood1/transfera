@@ -221,14 +221,26 @@ export default function Dashboard() {
 
   // Generate notifications from transfer data
   useEffect(() => {
-    if (!profile || transfers.length === 0) return;
+    console.log('[NOTIF] profile?.account?.id:', profile?.account?.id, 'transfers.length:', transfers.length);
+    if (!profile?.account?.id) {
+      console.log('[NOTIF] No account ID, skipping');
+      return;
+    }
+    if (transfers.length === 0) {
+      console.log('[NOTIF] No transfers, clearing notifications');
+      setNotifications([]);
+      return;
+    }
+    const myAccountId = profile.account.id;
+    console.log('[NOTIF] Generating notifications for', transfers.length, 'transfers');
     const notifs: Notification[] = transfers.slice(0, 20).map(t => {
-      const isDebit = t.sender_account_id === profile.account?.id;
+      const isDebit = t.sender_account_id === myAccountId;
+      console.log('[NOTIF] Transfer', t.id, 'sender:', t.sender_account_id, 'me:', myAccountId, 'isDebit:', isDebit);
       if (isDebit) {
         return {
           id: `debit-${t.id}`,
           type: 'debit' as const,
-          title: 'Money Sent',
+          title: t.status === 'pending' ? 'Transfer Pending' : t.status === 'completed' ? 'Transfer Completed' : 'Transfer Sent',
           message: `You sent ${formatCurrency(t.amount, t.currency)} to ${t.recipient_name}`,
           amount: t.amount,
           currency: t.currency,
@@ -250,12 +262,13 @@ export default function Dashboard() {
         };
       }
     });
-    // Merge with existing read state to avoid resetting
     setNotifications(prev => {
       const readMap = new Map(prev.filter(n => n.read).map(n => [n.id, true]));
-      return notifs.map(n => ({ ...n, read: readMap.has(n.id) || n.read }));
+      const merged = notifs.map(n => ({ ...n, read: readMap.has(n.id) || n.read }));
+      console.log('[NOTIF] Generated', merged.length, 'notifications');
+      return merged;
     });
-  }, [transfers, profile]);
+  }, [transfers, profile?.account?.id]);
 
   useEffect(() => {
     if (!profile?.account?.id) return;
