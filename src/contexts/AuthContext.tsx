@@ -13,6 +13,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -24,6 +25,7 @@ const AuthContext = createContext<AuthContextType>({
   signIn: async () => {},
   signOut: async () => {},
   refreshProfile: async () => {},
+  updatePassword: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -106,8 +108,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) await fetchProfile(user.id);
   };
 
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, isLoading, isProfileLoading, signUp, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, isLoading, isProfileLoading, signUp, signIn, signOut, refreshProfile, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );

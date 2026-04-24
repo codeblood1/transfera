@@ -7,6 +7,7 @@ import {
   Wallet, Clock, TrendingUp, Filter, Download,
   FileText, X, Eye, EyeOff, Copy, Check,
   Building2, Users, AlertTriangle, Bookmark, Trash2, UserCheck,
+  Banknote, CircleDollarSign, CheckCheck,
 } from 'lucide-react';
 import {
   createTransfer,
@@ -26,6 +27,18 @@ import {
 import { sendEmail, buildDebitAlertHTML, buildCreditAlertHTML } from '@/lib/emailService';
 import { getBankInfo } from '@/lib/bankData';
 import type { Transfer, Transaction, Country, Beneficiary } from '@/types';
+
+interface Notification {
+  id: string;
+  type: 'debit' | 'credit' | 'transfer_status';
+  title: string;
+  message: string;
+  amount?: number;
+  currency?: string;
+  referenceCode?: string;
+  read: boolean;
+  createdAt: string;
+}
 
 function formatCurrency(amount: number, currency: string): string {
   try {
@@ -168,6 +181,10 @@ export default function Dashboard() {
   const [saveAsBeneficiary, setSaveAsBeneficiary] = useState(false);
   const [saveAsBeneficiaryInt, setSaveAsBeneficiaryInt] = useState(false);
 
+  // Notifications
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
   // Modals
   const [showAddFundsModal, setShowAddFundsModal] = useState(false);
   const [showCardsModal, setShowCardsModal] = useState(false);
@@ -202,6 +219,44 @@ export default function Dashboard() {
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { fetchBeneficiaries(); }, [fetchBeneficiaries]);
 
+  // Generate notifications from transfer data
+  useEffect(() => {
+    if (!profile || transfers.length === 0) return;
+    const notifs: Notification[] = transfers.slice(0, 20).map(t => {
+      const isDebit = t.sender_account_id === profile.account?.id;
+      if (isDebit) {
+        return {
+          id: `debit-${t.id}`,
+          type: 'debit' as const,
+          title: 'Money Sent',
+          message: `You sent ${formatCurrency(t.amount, t.currency)} to ${t.recipient_name}`,
+          amount: t.amount,
+          currency: t.currency,
+          referenceCode: t.reference_code,
+          read: false,
+          createdAt: t.created_at,
+        };
+      } else {
+        return {
+          id: `credit-${t.id}`,
+          type: 'credit' as const,
+          title: 'Money Received',
+          message: `You received ${formatCurrency(t.amount, t.currency)} from ${t.recipient_name}`,
+          amount: t.amount,
+          currency: t.currency,
+          referenceCode: t.reference_code,
+          read: false,
+          createdAt: t.created_at,
+        };
+      }
+    });
+    // Merge with existing read state to avoid resetting
+    setNotifications(prev => {
+      const readMap = new Map(prev.filter(n => n.read).map(n => [n.id, true]));
+      return notifs.map(n => ({ ...n, read: readMap.has(n.id) || n.read }));
+    });
+  }, [transfers, profile]);
+
   useEffect(() => {
     if (!profile?.account?.id) return;
     const tSub = subscribeToTransfers(profile.account.id, () => { fetchData(); refreshProfile(); });
@@ -224,7 +279,6 @@ export default function Dashboard() {
   const myAccountNumber = profile?.account?.account_number ?? '';
   const pendingAmount = transfers.filter(t => t.status === 'pending').reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0), 0);
   const pendingFees = transfers.filter(t => t.status === 'pending').reduce((sum, t) => sum + (typeof t.fee === 'number' ? t.fee : 0), 0);
-  const pendingCount = transfers.filter(t => t.status === 'pending').length;
   const availableBalance = balance - pendingAmount - pendingFees;
 
   // ── Transfer Limits ──
@@ -433,6 +487,16 @@ export default function Dashboard() {
   };
   useEffect(() => { if (activeTab === 'exchange') handleCalculateExchange(); /* eslint-disable-next-line */ }, [activeTab, exchangeFrom, exchangeTo]);
 
+  const markNotificationRead = (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const markAllRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
   // Quick actions
   const scrollToSend = () => { setActiveTab('send'); setTransferType('external'); transferFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   const showAddFunds = () => setShowAddFundsModal(true);
@@ -479,10 +543,61 @@ export default function Dashboard() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
-            <button className="relative w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-[#F5F5F0]/60 hover:bg-white/10 transition-all">
-              <Bell className="w-5 h-5" />
-              {pendingCount > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-[#D4A853] rounded-full" />}
-            </button>
+            {/* Notification Bell */}
+            <div className="relative">
+              <button onClick={() => setShowNotifications(!showNotifications)} className="relative w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-[#F5F5F0]/60 hover:bg-white/10 transition-all">
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center px-1">
+                    <span className="text-[10px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                  </span>
+                )}
+              </button>
+              {/* Notification Dropdown */}
+              {showNotifications && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+                  <div className="absolute right-0 top-full mt-3 w-[380px] bg-gradient-to-br from-[#1B2132] to-[#14192A] rounded-2xl border border-white/10 shadow-2xl z-50 overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                      <div className="flex items-center gap-2">
+                        <Bell className="w-4 h-4 text-[#D4A853]" />
+                        <h3 className="text-sm font-semibold text-[#F5F5F0]">Notifications</h3>
+                        {unreadCount > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium">{unreadCount} new</span>}
+                      </div>
+                      {unreadCount > 0 && (
+                        <button onClick={markAllRead} className="text-xs text-[#D4A853] hover:text-[#F5F5F0] transition-colors flex items-center gap-1">
+                          <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-[420px] overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="text-center py-10 px-6">
+                          <Bell className="w-10 h-10 text-[#F5F5F0]/10 mx-auto mb-3" />
+                          <p className="text-sm text-[#F5F5F0]/30">No notifications yet</p>
+                          <p className="text-xs text-[#F5F5F0]/20 mt-1">Make a transfer to see alerts here</p>
+                        </div>
+                      ) : notifications.map(n => (
+                        <button key={n.id} onClick={() => { markNotificationRead(n.id); setShowNotifications(false); }} className={`w-full text-left px-5 py-4 border-b border-white/5 hover:bg-white/5 transition-all flex items-start gap-3 ${!n.read ? 'bg-[#D4A853]/[0.03]' : ''}`}>
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${n.type === 'debit' ? 'bg-[#D4A853]/10' : n.type === 'credit' ? 'bg-emerald-500/10' : 'bg-blue-500/10'}`}>
+                            {n.type === 'debit' ? <Banknote className="w-4 h-4 text-[#D4A853]" /> : n.type === 'credit' ? <CircleDollarSign className="w-4 h-4 text-emerald-400" /> : <Clock className="w-4 h-4 text-blue-400" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className={`text-sm font-medium ${!n.read ? 'text-[#F5F5F0]' : 'text-[#F5F5F0]/60'}`}>{n.title}</p>
+                              {!n.read && <span className="w-2 h-2 rounded-full bg-[#D4A853] shrink-0" />}
+                            </div>
+                            <p className={`text-xs mt-0.5 ${!n.read ? 'text-[#F5F5F0]/50' : 'text-[#F5F5F0]/30'}`}>{n.message}</p>
+                            {n.referenceCode && <p className="text-[10px] text-[#F5F5F0]/20 mt-1 font-mono">{n.referenceCode}</p>}
+                            <p className="text-[10px] text-[#F5F5F0]/20 mt-1">{formatDate(n.createdAt)}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <div className="flex items-center gap-3 pl-4 border-l border-white/10">
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#D4A853] to-[#B08A3E] flex items-center justify-center">
                 <span className="text-sm font-semibold text-[#0C1222]">{user?.email?.charAt(0).toUpperCase() || 'U'}</span>
