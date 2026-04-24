@@ -7,7 +7,6 @@ import {
   Wallet, Clock, TrendingUp, Filter, Download,
   FileText, X, Eye, EyeOff, Copy, Check,
   Building2, Users, AlertTriangle, Bookmark, Trash2, UserCheck,
-  Banknote, CircleDollarSign, CheckCheck,
 } from 'lucide-react';
 import {
   createTransfer,
@@ -579,7 +578,7 @@ export default function Dashboard() {
                       </div>
                       {unreadCount > 0 && (
                         <button onClick={markAllRead} className="text-xs text-[#D4A853] hover:text-[#F5F5F0] transition-colors flex items-center gap-1">
-                          <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                          <Check className="w-3.5 h-3.5" /> Mark all read
                         </button>
                       )}
                     </div>
@@ -593,7 +592,7 @@ export default function Dashboard() {
                       ) : notifications.map(n => (
                         <button key={n.id} onClick={() => { markNotificationRead(n.id); setShowNotifications(false); }} className={`w-full text-left px-5 py-4 border-b border-white/5 hover:bg-white/5 transition-all flex items-start gap-3 ${!n.read ? 'bg-[#D4A853]/[0.03]' : ''}`}>
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${n.type === 'debit' ? 'bg-[#D4A853]/10' : n.type === 'credit' ? 'bg-emerald-500/10' : 'bg-blue-500/10'}`}>
-                            {n.type === 'debit' ? <Banknote className="w-4 h-4 text-[#D4A853]" /> : n.type === 'credit' ? <CircleDollarSign className="w-4 h-4 text-emerald-400" /> : <Clock className="w-4 h-4 text-blue-400" />}
+                            {n.type === 'debit' ? <Send className="w-4 h-4 text-[#D4A853]" /> : n.type === 'credit' ? <ArrowDownLeft className="w-4 h-4 text-emerald-400" /> : <Clock className="w-4 h-4 text-blue-400" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
